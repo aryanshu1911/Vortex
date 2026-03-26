@@ -1,34 +1,41 @@
 # utils/cli_theme.py
 
-import sys, time
+from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
-# Colors
-RED = "\033[91m"
-GREEN = "\033[92m"
-YELLOW = "\033[93m"
-BLUE = "\033[94m"
-MAGENTA = "\033[95m"
-CYAN = "\033[96m"
-RESET = "\033[0m"
+console = Console()
 
-# Proper ASCII Logo for Vortex
+# Professional color palette
+THEME = {
+    "info": "cyan",
+    "success": "green",
+    "warning": "yellow",
+    "error": "red",
+    "bold": "bold white",
+    "muted": "bright_black"
+}
+
 def print_logo():
     logo = r"""
-███████╗███████╗████████╗ ██████╗ ██████╗ ███████╗
-██╔════╝██╔════╝╚══██╔══╝██╔═══██╗██╔══██╗██╔════╝
-█████╗  █████╗     ██║   ██║   ██║██████╔╝█████╗  
-██╔══╝  ██╔══╝     ██║   ██║   ██║██╔═══╝ ██╔══╝  
-███████╗███████╗   ██║   ╚██████╔╝██║     ███████╗
-╚══════╝╚══════╝   ╚═╝    ╚═════╝ ╚═╝     ╚══════╝
-Vortex - Offensive & Defensive Network Scanner
-"""
-    print(f"{CYAN}{logo}{RESET}")
+ ██╗   ██╗ ██████╗ ██████╗ ████████╗███████╗██╗  ██╗
+ ██║   ██║██╔═══██╗██╔══██╗╚══██╔══╝██╔════╝╚██╗██╔╝
+ ██║   ██║██║   ██║██████╔╝   ██║   █████╗   ╚███╔╝ 
+ ╚██╗ ██╔╝██║   ██║██╔══██╗   ██║   ██╔══╝   ██╔██╗ 
+  ╚████╔╝ ╚██████╔╝██║  ██║   ██║   ███████╗██╔╝ ██╗
+   ╚═══╝   ╚═════╝ ╚═╝  ╚═╝   ╚═══╝   ╚══════╝╚═╝  ╚══╝
+    Vortex - Offensive & Defensive Network Scanner
+    """
+    console.print(Panel(Text(logo, style="bold cyan"), border_style="blue", expand=False))
 
-# Spinner/progress
-def spinner(task, duration=2):
-    spinner_chars = "|/-\\"
-    print(f"{BLUE}[+] {task}...{RESET}", end=" ", flush=True)
-    for i in range(duration * 4):
-        print(spinner_chars[i % 4], end="\b", flush=True)
-        time.sleep(0.25)
-    print("✔")
+def print_info(message):
+    console.print(f"[[{THEME['info']} bold]*[/]] {message}")
+
+def print_success(message):
+    console.print(f"[[{THEME['success']} bold]+[/]] {message}")
+
+def print_warning(message):
+    console.print(f"[[{THEME['warning']} bold]![/]] {message}")
+
+def print_error(message):
+    console.print(f"[[{THEME['error']} bold]-[/]] {message}")

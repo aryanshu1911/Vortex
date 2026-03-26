@@ -1,23 +1,32 @@
+import asyncio
 import socket
-from concurrent.futures import ThreadPoolExecutor
 
-def scan_port(ip, port):
+async def scan_port(ip, port, timeout=0.5):
+    """
+    Asynchronously scan a single port.
+    """
     try:
-        sock = socket.socket()
-        sock.settimeout(0.5)
-        if sock.connect_ex((ip, port)) == 0:
-            sock.close()
-            return port
-        sock.close()
-    except:
-        pass
-    return None
+        # Use asyncio.open_connection for high-performance async I/O
+        conn = asyncio.open_connection(ip, port)
+        await asyncio.wait_for(conn, timeout=timeout)
+        return port
+    except (asyncio.TimeoutError, ConnectionRefusedError, OSError):
+        return None
 
+async def scan_ports_async(ip, ports, max_concurrent=200):
+    """
+    Scan a list of ports concurrently using a semaphore to limit concurrency.
+    """
+    semaphore = asyncio.Semaphore(max_concurrent)
+    
+    async def sem_scan(port):
+        async with semaphore:
+            return await scan_port(ip, port)
+
+    tasks = [sem_scan(port) for port in ports]
+    results = await asyncio.gather(*tasks)
+    return [port for port in results if port is not None]
+
+# For backward compatibility if needed, but we'll move to full async
 def scan_ports(ip, ports):
-    open_ports = []
-    with ThreadPoolExecutor(max_workers=50) as executor:
-        results = executor.map(lambda p: scan_port(ip, p), ports)
-    for port in results:
-        if port:
-            open_ports.append(port)
-    return open_ports
+    return asyncio.run(scan_ports_async(ip, ports))

@@ -1,21 +1,43 @@
-import subprocess
+import asyncio
 import platform
-from concurrent.futures import ThreadPoolExecutor
 
-def ping_host(ip):
+async def ping_host(ip):
+    """
+    Asynchronously ping a host.
+    """
     param = "-n" if platform.system().lower() == "windows" else "-c"
+    # -w 1000 is 1 second timeout on Windows
     command = ["ping", param, "1", "-w", "1000", ip]
+    
     try:
-        return subprocess.run(command, stdout=subprocess.DEVNULL).returncode == 0
-    except:
-        return False
+        proc = await asyncio.create_subprocess_exec(
+            *command,
+            stdout=asyncio.subprocess.DEVNULL,
+            stderr=asyncio.subprocess.DEVNULL
+        )
+        await proc.wait()
+        return ip if proc.returncode == 0 else None
+    except Exception:
+        return None
 
-def discover_hosts(network_prefix):
-    live_hosts = []
+async def discover_hosts_async(network_prefix, max_concurrent=50):
+    """
+    Discover live hosts in a network prefix (e.g., 192.168.1.) concurrently.
+    """
+    if not network_prefix.endswith("."):
+        network_prefix += "."
+        
     ips = [f"{network_prefix}{i}" for i in range(1, 255)]
-    with ThreadPoolExecutor(max_workers=50) as executor:
-        results = list(executor.map(ping_host, ips))
-    for i, alive in enumerate(results, start=1):
-        if alive:
-            live_hosts.append(f"{network_prefix}{i}")
-    return live_hosts
+    semaphore = asyncio.Semaphore(max_concurrent)
+
+    async def sem_ping(ip):
+        async with semaphore:
+            return await ping_host(ip)
+
+    tasks = [sem_ping(ip) for ip in ips]
+    results = await asyncio.gather(*tasks)
+    return [ip for ip in results if ip is not None]
+
+# For backward compatibility
+def discover_hosts(network_prefix):
+    return asyncio.run(discover_hosts_async(network_prefix))
