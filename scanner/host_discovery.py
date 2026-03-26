@@ -20,12 +20,23 @@ async def ping_host(ip):
     except Exception:
         return None
 
-async def discover_hosts_async(network_prefix, max_concurrent=50):
+async def discover_hosts_async(target, max_concurrent=50):
     """
-    Discover live hosts in a network prefix (e.g., 192.168.1.) concurrently.
+    Discover live hosts in a network concurrently.
+    Correctly handles CIDR notation or raw IP/prefix.
     """
-    if not network_prefix.endswith("."):
-        network_prefix += "."
+    if "/" in target:
+        # Simple CIDR handling for /24
+        network_prefix = ".".join(target.split(".")[:3]) + "."
+    elif target.count(".") == 3:
+        # Full IP provided, strip last octet
+        network_prefix = ".".join(target.split(".")[:3]) + "."
+    elif target.count(".") == 2 and target.endswith("."):
+        # Already a prefix
+        network_prefix = target
+    else:
+        # Fallback
+        network_prefix = target if target.endswith(".") else target + "."
         
     ips = [f"{network_prefix}{i}" for i in range(1, 255)]
     semaphore = asyncio.Semaphore(max_concurrent)

@@ -13,7 +13,7 @@ from scanner.banner import grab_banner
 from scanner.host_discovery import discover_hosts_async
 from vuln.analyzer import analyze
 from output.writer import save_json_report, save_txt_report
-from utils.cli_theme import print_logo, console, print_info, print_success, print_warning, THEME
+from utils.cli_theme import print_logo, console, print_info, print_success, print_warning, print_error, THEME
 
 async def run_scan(target, ports, network_scan, output_file, save_txt):
     print_logo()
@@ -32,6 +32,10 @@ async def run_scan(target, ports, network_scan, output_file, save_txt):
             progress.update(task, completed=254, description=f"Found {len(targets)} live hosts")
     else:
         targets = [target]
+
+    if not targets:
+        print_error(f"No live hosts discovered in {target}. Check your network connection or target IP.")
+        return
 
     final_results = []
     
@@ -89,17 +93,31 @@ async def run_scan(target, ports, network_scan, output_file, save_txt):
     if save_txt:
         save_txt_report(report, output_file.replace(".json", ".txt"))
     
-    console.print(Panel(f"Scan completed. Reports saved: [bold white]{output_file}[/]", style="green", title="Success"))
+    summary_panel = Panel(
+        f"Scan Target: [bold white]{target}[/]\n"
+        f"Hosts Scanned: [bold white]{len(targets)}[/]\n"
+        f"Reports Saved: [bold cyan]{output_file}[/]",
+        style="green",
+        title="[bold white]Scan Summary[/]",
+        expand=False
+    )
+    console.print(summary_panel)
 
 def main():
     parser = argparse.ArgumentParser(description="Vortex - High Performance Network Scanner")
     parser.add_argument("target", nargs="?", help="Target IP or Network prefix (e.g. 192.168.1.)")
     parser.add_argument("-p", "--ports", help="Comma separated ports to scan", default=None)
+    parser.add_argument("-f", "--full", action="store_true", help="Scan all 65535 ports (overrides -p)")
     parser.add_argument("-n", "--network", action="store_true", help="Perform network discovery scan")
     parser.add_argument("-o", "--output", help="Output JSON file", default="vortex_report.json")
     parser.add_argument("-t", "--txt", action="store_true", help="Save TXT report as well")
     
     args = parser.parse_args()
+
+    COMMON_PORTS = [
+        20, 21, 22, 23, 25, 53, 80, 110, 111, 135, 139, 143, 443, 445, 
+        993, 995, 1723, 3306, 3389, 5432, 5900, 6379, 8080, 8443, 27017
+    ]
 
     if not args.target:
         print_logo()
@@ -111,8 +129,21 @@ def main():
                 return
             
             network_scan = console.input("[bold white]Scan entire network? (y/N): [/]").strip().lower() == "y"
-            ports_input = console.input("[bold white]Enter ports (default: common ports): [/]").strip()
-            ports = list(map(int, ports_input.split(","))) if ports_input else [21,22,23,25,53,80,110,139,143,443,445,3389]
+            
+            console.print("\n[bold white]Port Scan Mode:[/]")
+            console.print("  [cyan]1)[/] Common Ports (Top 25) [default]")
+            console.print("  [cyan]2)[/] Full Scan (1-65535) - [yellow]Slow[/]")
+            console.print("  [cyan]3)[/] Custom Ports")
+            choice = console.input("[bold white]Choose mode (1-3): [/]").strip()
+            
+            if choice == "2":
+                ports = list(range(1, 65536))
+            elif choice == "3":
+                ports_input = console.input("[bold white]Enter ports (comma separated): [/]").strip()
+                ports = list(map(int, ports_input.split(",")))
+            else:
+                ports = COMMON_PORTS
+                
             output_file = console.input("[bold white]Output JSON file (vortex_report.json): [/]").strip() or "vortex_report.json"
             save_txt = console.input("[bold white]Save TXT report? (y/N): [/]").strip().lower() == "y"
         except (KeyboardInterrupt, EOFError):
@@ -120,7 +151,12 @@ def main():
     else:
         target = args.target
         network_scan = args.network
-        ports = list(map(int, args.ports.split(","))) if args.ports else [21,22,23,25,53,80,110,139,143,443,445,3389]
+        if args.full:
+            ports = list(range(1, 65536))
+        elif args.ports:
+            ports = list(map(int, args.ports.split(",")))
+        else:
+            ports = COMMON_PORTS
         output_file = args.output
         save_txt = args.txt
 
